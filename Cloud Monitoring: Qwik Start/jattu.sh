@@ -83,13 +83,12 @@ else
         --zone=$ZONE \
         --machine-type=e2-medium \
         --network-interface=network-tier=PREMIUM,stack-type=IPV4_ONLY,subnet=default \
-        --metadata=enable-oslogin=false \
         --tags=http-server \
         --image-family=debian-12 \
         --image-project=debian-cloud \
         --boot-disk-size=10GB \
         --boot-disk-type=pd-balanced \
-        --metadata=startup-script='#! /bin/bash
+        --metadata=enable-oslogin=false,startup-script='#! /bin/bash
 apt-get update
 apt-get install -y apache2 php
 systemctl enable apache2
