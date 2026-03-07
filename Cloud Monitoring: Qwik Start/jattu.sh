@@ -28,6 +28,9 @@ show_progress "Starting Cloud Monitoring Lab Automation..."
 read -p "Enter ZONE (example: us-east1-c): " ZONE
 export ZONE
 
+read -p "Enter your personal EMAIL for alerts: " USER_EMAIL
+export USER_EMAIL
+
 PROJECT_ID=$(gcloud config get-value project)
 show_progress "Using project: $PROJECT_ID"
 
@@ -93,28 +96,38 @@ gcloud monitoring uptime create lamp-uptime-check \
 --port=80
 
 # ------------------------------------------------
+# Create Notification Channel
+# ------------------------------------------------
+show_progress "Creating notification channel for $USER_EMAIL..."
+
+gcloud beta monitoring channels create --display-name="Personal Alert" --type=email --channel-labels=email_address=$USER_EMAIL
+
+# Get the channel name
+CHANNEL_ID=$(gcloud beta monitoring channels list --filter='displayName="Personal Alert"' --format='value(name)')
+
+# ------------------------------------------------
 # Create alert policy
 # ------------------------------------------------
 show_progress "Creating alert policy..."
 
 cat > alert.json <<EOF
 {
-"displayName": "Inbound Traffic Alert",
-"combiner": "OR",
-"conditions": [{
-"displayName": "Network traffic alert",
-"conditionThreshold": {
-"filter": "resource.type=\"gce_instance\" AND metric.type=\"agent.googleapis.com/interface/traffic\"",
-"comparison": "COMPARISON_GT",
-"thresholdValue": 500,
-"duration": "60s",
-"trigger": {"count": 1}
-}
-}]
+  "displayName": "Inbound Traffic Alert",
+  "combiner": "OR",
+  "conditions": [{
+    "displayName": "Network traffic alert",
+    "conditionThreshold": {
+      "filter": "resource.type=\"gce_instance\" AND metric.type=\"agent.googleapis.com/interface/traffic\"",
+      "comparison": "COMPARISON_GT",
+      "thresholdValue": 500,
+      "duration": "60s",
+      "trigger": {"count": 1}
+    }
+  }]
 }
 EOF
 
-gcloud alpha monitoring policies create --policy-from-file=alert.json
+gcloud alpha monitoring policies create --policy-from-file=alert.json --notification-channels=$CHANNEL_ID
 
 # ------------------------------------------------
 # Create Dashboard

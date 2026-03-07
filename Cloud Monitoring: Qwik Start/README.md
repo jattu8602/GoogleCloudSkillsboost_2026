@@ -26,10 +26,7 @@ sudo chmod +x jattu.sh
 After running the script, follow these final steps to ensure you get full credit for the lab:
 
 1.  **Zone Input:** When you run the script, it will ask you to enter the **ZONE** (e.g., `us-west1-a`). You must type this in exactly as it appears in your lab credentials so it knows where to build the VM.
-2.  **Notification Channels:** While the script creates the **Alert Policy** logic (which is enough to pass the lab check), Google Cloud requires you to manually add an email address if you want to receive the alerts.
-    - Go to **Monitoring** > **Alerting**.
-    - Click **Manage channels**.
-    - Add your **Personal Email** and enter any **Display Name** (e.g., `My Alerts`) and save.
+2.  **Notification Channels:** The script now **automatically** creates the notification channel using the email you provided and attaches it to the alert policy. You can verify this in **Monitoring** > **Alerting** > **Manage channels** if you wish.
 3.  **Click "Check My Progress":** Once the script finishes showing the ✅ message, go back to the lab instruction page and click all the **Check My Progress** buttons to get your points.
 
 ---
