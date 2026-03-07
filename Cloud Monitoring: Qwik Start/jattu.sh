@@ -24,35 +24,57 @@ function show_progress() {
 
 show_progress "Starting Cloud Monitoring Lab Automation..."
 
-# Ask user input
-read -p "Enter ZONE (example: us-east1-c): " ZONE
-export ZONE
+# Get Default Project ID
+PROJECT_ID=$(gcloud config get-value project)
+export DEVSHELL_PROJECT_ID=$PROJECT_ID
 
+# Ask user input for Email (required for automation)
 read -p "Enter your personal EMAIL for alerts: " USER_EMAIL
 export USER_EMAIL
 
-PROJECT_ID=$(gcloud config get-value project)
-show_progress "Using project: $PROJECT_ID"
+# Fetch Default Zone and Region
+export ZONE=$(gcloud compute project-info describe \
+--format="value(commonInstanceMetadata.items[google-compute-default-zone])")
 
-# ------------------------------------------------
-# Set region automatically
-# ------------------------------------------------
-REGION=$(echo $ZONE | sed 's/-[a-z]$//')
+export REGION=$(gcloud compute project-info describe \
+--format="value(commonInstanceMetadata.items[google-compute-default-region])")
+
+# Fallback if metadata is not set
+if [ -z "$ZONE" ]; then
+    read -p "Enter ZONE (e.g., us-west1-a): " ZONE
+    REGION=$(echo $ZONE | sed 's/-[a-z]$//')
+fi
+
+show_progress "Using Project: $PROJECT_ID"
+show_progress "Using Zone: $ZONE"
+show_progress "Using Region: $REGION"
+
 gcloud config set compute/zone $ZONE
 gcloud config set compute/region $REGION
 
 # ------------------------------------------------
-# Create VM
+# Task 1 & 2: Create VM and Install Apache/Ops Agent
 # ------------------------------------------------
 show_progress "Creating LAMP VM instance..."
 
 gcloud compute instances create lamp-1-vm \
---zone=$ZONE \
---machine-type=e2-medium \
---image-family=debian-12 \
---image-project=debian-cloud \
---tags=http-server \
---metadata=startup-script='#! /bin/bash
+    --project=$PROJECT_ID \
+    --zone=$ZONE \
+    --machine-type=e2-medium \
+    --network-interface=network-tier=PREMIUM,stack-type=IPV4_ONLY,subnet=default \
+    --metadata=enable-oslogin=false \
+    --maintenance-policy=MIGRATE \
+    --provisioning-model=STANDARD \
+    --tags=http-server \
+    --image-family=debian-12 \
+    --image-project=debian-cloud \
+    --create-disk=auto-delete=yes,boot=yes,device-name=lamp-1-vm,mode=rw,size=10,type=projects/$PROJECT_ID/zones/$ZONE/diskTypes/pd-balanced \
+    --no-shielded-secure-boot \
+    --shielded-vtpm \
+    --shielded-integrity-monitoring \
+    --labels=goog-ec-src=vm_add-gcloud \
+    --reservation-affinity=any \
+    --metadata=startup-script='#! /bin/bash
 apt-get update
 apt-get install -y apache2 php
 systemctl enable apache2
@@ -67,70 +89,112 @@ bash add-google-cloud-ops-agent-repo.sh --also-install
 show_progress "Creating firewall rule to allow HTTP..."
 
 gcloud compute firewall-rules create allow-http \
---allow tcp:80 \
---target-tags=http-server \
---source-ranges=0.0.0.0/0 \
---description="Allow HTTP"
+    --project=$PROJECT_ID \
+    --direction=INGRESS \
+    --priority=1000 \
+    --network=default \
+    --action=ALLOW \
+    --rules=tcp:80 \
+    --source-ranges=0.0.0.0/0 \
+    --target-tags=http-server
 
-show_progress "Waiting 20 seconds for initialization..."
-sleep 20
-
-# ------------------------------------------------
-# Get External IP
-# ------------------------------------------------
-EXTERNAL_IP=$(gcloud compute instances describe lamp-1-vm \
---zone=$ZONE \
---format='get(networkInterfaces[0].accessConfigs[0].natIP)')
-
-show_progress "VM External IP: $EXTERNAL_IP"
+show_progress "Waiting for VM initialization (30 seconds)..."
+sleep 30
 
 # ------------------------------------------------
-# Create uptime check
+# Task 3: Create Uptime Check (using REST API for reliability)
 # ------------------------------------------------
-show_progress "Creating uptime check..."
+show_progress "Creating Uptime Check via Monitoring API..."
 
-gcloud monitoring uptime create lamp-uptime-check \
---resource-type=uptime-url \
---hostname=$EXTERNAL_IP \
---path="/" \
---port=80
+INSTANCE_ID=$(gcloud compute instances list --filter=lamp-1-vm --zones $ZONE --format="value(id)")
 
-# ------------------------------------------------
-# Create Notification Channel
-# ------------------------------------------------
-show_progress "Creating notification channel for $USER_EMAIL..."
-
-gcloud beta monitoring channels create --display-name="Personal Alert" --type=email --channel-labels=email_address=$USER_EMAIL
-
-# Get the channel name
-CHANNEL_ID=$(gcloud beta monitoring channels list --filter='displayName="Personal Alert"' --format='value(name)')
-
-# ------------------------------------------------
-# Create alert policy
-# ------------------------------------------------
-show_progress "Creating alert policy..."
-
-cat > alert.json <<EOF
+curl -X POST -H "Authorization: Bearer $(gcloud auth print-access-token)" -H "Content-Type: application/json" \
+  "https://monitoring.googleapis.com/v3/projects/$PROJECT_ID/uptimeCheckConfigs" \
+  -d "$(cat <<EOF
 {
-  "displayName": "Inbound Traffic Alert",
-  "combiner": "OR",
-  "conditions": [{
-    "displayName": "Network traffic alert",
-    "conditionThreshold": {
-      "filter": "resource.type=\"gce_instance\" AND metric.type=\"agent.googleapis.com/interface/traffic\"",
-      "comparison": "COMPARISON_GT",
-      "thresholdValue": 500,
-      "duration": "60s",
-      "trigger": {"count": 1}
-    }
-  }]
+  "displayName": "Lamp Uptime Check",
+  "httpCheck": {
+    "path": "/",
+    "port": 80,
+    "requestMethod": "GET"
+  },
+  "monitoredResource": {
+    "labels": {
+      "instance_id": "$INSTANCE_ID",
+      "project_id": "$PROJECT_ID",
+      "zone": "$ZONE"
+    },
+    "type": "gce_instance"
+  }
+}
+EOF
+)"
+
+# ------------------------------------------------
+# Task 4: Create Notification Channel and Alert Policy
+# ------------------------------------------------
+show_progress "Automating Alert Policy and Notification Channel..."
+
+# Create the channel
+cat > email-channel.json <<EOF
+{
+  "type": "email",
+  "displayName": "Personal Alert",
+  "description": "Alert notification for $USER_EMAIL",
+  "labels": {
+    "email_address": "$USER_EMAIL"
+  }
 }
 EOF
 
-gcloud alpha monitoring policies create --policy-from-file=alert.json --notification-channels=$CHANNEL_ID
+gcloud beta monitoring channels create --channel-content-from-file="email-channel.json"
+
+# Get the channel name (id)
+CHANNEL_ID=$(gcloud beta monitoring channels list --filter='displayName="Personal Alert"' --format='value(name)')
+
+# Create the alert policy attached to the channel
+cat > alert-policy.json <<EOF
+{
+  "displayName": "Inbound Traffic Alert",
+  "userLabels": {},
+  "conditions": [
+    {
+      "displayName": "VM Instance - Network traffic",
+      "conditionThreshold": {
+        "filter": "resource.type = \"gce_instance\" AND metric.type = \"agent.googleapis.com/interface/traffic\"",
+        "aggregations": [
+          {
+            "alignmentPeriod": "60s",
+            "crossSeriesReducer": "REDUCE_NONE",
+            "perSeriesAligner": "ALIGN_RATE"
+          }
+        ],
+        "comparison": "COMPARISON_GT",
+        "duration": "60s",
+        "trigger": {
+          "count": 1
+        },
+        "thresholdValue": 500
+      }
+    }
+  ],
+  "alertStrategy": {
+    "notificationPrompts": [
+      "OPENED"
+    ]
+  },
+  "combiner": "OR",
+  "enabled": true,
+  "notificationChannels": [
+    "$CHANNEL_ID"
+  ]
+}
+EOF
+
+gcloud alpha monitoring policies create --policy-from-file="alert-policy.json"
 
 # ------------------------------------------------
-# Create Dashboard
+# Task 5: Create Dashboard
 # ------------------------------------------------
 show_progress "Creating monitoring dashboard..."
 
@@ -176,10 +240,10 @@ gcloud monitoring dashboards create --config-from-file=dashboard.json
 # ------------------------------------------------
 # Restart VM to trigger logs
 # ------------------------------------------------
-show_progress "Restarting VM to generate logs..."
+show_progress "Restarting VM to generate traffic and logs..."
 
 gcloud compute instances stop lamp-1-vm --zone=$ZONE
-sleep 15
+sleep 10
 gcloud compute instances start lamp-1-vm --zone=$ZONE
 
 echo ""

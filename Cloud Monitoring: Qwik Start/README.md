@@ -25,9 +25,10 @@ sudo chmod +x jattu.sh
 
 After running the script, follow these final steps to ensure you get full credit for the lab:
 
-1.  **Zone Input:** When you run the script, it will ask you to enter the **ZONE** (e.g., `us-west1-a`). You must type this in exactly as it appears in your lab credentials so it knows where to build the VM.
-2.  **Notification Channels:** The script now **automatically** creates the notification channel using the email you provided and attaches it to the alert policy. You can verify this in **Monitoring** > **Alerting** > **Manage channels** if you wish.
-3.  **Click "Check My Progress":** Once the script finishes showing the ✅ message, go back to the lab instruction page and click all the **Check My Progress** buttons to get your points.
+1.  **Zone Detection:** The script will attempt to detect your **ZONE** automatically. If it cannot, it will ask you to enter it (e.g., `us-west1-a`). Be sure to use the one from your lab credentials.
+2.  **Email Input:** You will be prompted for your **Personal Email**. The script uses this to automatically build and attach your notification channel.
+3.  **Notification Channels:** The script now **automatically** creates the notification channel and attaches it to the alert policy. You can verify this in **Monitoring** > **Alerting** > **Manage channels**.
+4.  **Click "Check My Progress":** Once the script finishes showing the ✅ message, go back to the lab instruction page and click all the **Check My Progress** buttons to get your points.
 
 ---
 
