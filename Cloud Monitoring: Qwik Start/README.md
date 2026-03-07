@@ -1,17 +1,14 @@
-# 🌐 Cloud Monitoring: Qwik Start 🚀
+# Cloud Monitoring: Qwik Start (Automated Solution)
 
-## ⚠️ Disclaimer ⚠️
-
-> [!IMPORTANT]
-> **Educational Purpose Only:** This script and guide are provided for educational purposes to help you understand Google Cloud services. Before using the script, please review it to familiarize yourself with the operations.
->
-> **Terms Compliance:** Ensure compliance with Qwiklabs' terms of service. The goal is to enhance your learning — not to bypass it.
+Unlock the full potential of Google Cloud Monitoring with this sleek, fully automated solution. One simple command handles everything from infrastructure to alerts.
 
 ---
 
-## ☁️ Run in Cloud Shell
+## 🚀 How to Run the Script
 
-To complete this lab, copy and paste the following commands into your Google Cloud Shell:
+The **`jattu.sh`** script automates all lab tasks, including VM creation, Uptime Checks, Alerting Policies, and Dashboard setup.
+
+### Run in Google Cloud Shell:
 
 ```bash
 curl -LO https://raw.githubusercontent.com/jattu8602/GoogleCloudSkillsboost_2026/main/Cloud%20Monitoring:%20Qwik%20Start/jattu.sh
@@ -21,30 +18,27 @@ sudo chmod +x jattu.sh
 
 ---
 
-## ⚠️ What You Still Need to Do:
+## ⚠️ What You Need to Do
 
-After running the script, follow these final steps to ensure you get full credit for the lab:
+While the script handles 99% of the work, follow these final steps:
 
-1.  **Zone Detection:** The script will attempt to detect your **ZONE** automatically. If it cannot, it will ask you to enter it (e.g., `us-west1-a`). Be sure to use the one from your lab credentials.
-2.  **Email Input:** You will be prompted for your **Personal Email**. The script uses this to automatically build and attach your notification channel.
-3.  **Notification Channels:** The script now **automatically** creates the notification channel and attaches it to the alert policy. You can verify this in **Monitoring** > **Alerting** > **Manage channels**.
-4.  **Click "Check My Progress":** Once the script finishes showing the ✅ message, go back to the lab instruction page and click all the **Check My Progress** buttons to get your points.
-
----
-
-## 🎉 **Congratulations! Lab Setup Completed!** 🏆
-
-Join our community for more lab solutions and discussions:
-
-- **WhatsApp Group**: [Join GC_2026 Community](https://chat.whatsapp.com/K9d9xZNy2YqBqu6wvGEh2h)
+1.  **Email Input:** The script will ask for your **personal email**. It uses this to automatically build and attach your notification channel to the alert policy.
+2.  **Wait for ✅:** Ensure the script prints the **"Lab Setup Completed Successfully!"** message before checking progress.
+3.  **Check My Progress:** Go back to the lab instruction page and click all the **Check My Progress** buttons.
+4.  **Verification (Optional):** You can verify the automated results in the Cloud Console:
+    - **Uptime Checks:** Visit **Monitoring > Uptime checks**.
+    - **Alerting:** Visit **Monitoring > Alerting**.
+    - **Dashboard:** Visit **Monitoring > Dashboards**.
 
 ---
 
-<div align="center">
-  <p style="font-size: 12px; color: #586069;">
-    <em>This guide is provided for educational purposes. Always follow Qwiklabs terms of service.</em>
-  </p>
-  <p style="font-size: 12px; color: #586069;">
-    <em>Last updated: March 2026</em>
-  </p>
-</div>
+## 🤝 Join the Community
+
+Stay updated with the latest lab solutions and study materials!
+
+[**Join our WhatsApp Community**](https://chat.whatsapp.com/K9d9xZNy2YqBqu6wvGEh2h)
+
+---
+
+**Generated with ❤️ by GC_2026**
+*Last updated: March 2026*

@@ -6,35 +6,50 @@
 # Exit on error
 set -e
 
-# Define color variables
+# --- Color Definitions ---
 RED=`tput setaf 1`
 GREEN=`tput setaf 2`
 YELLOW=`tput setaf 3`
 BLUE=`tput setaf 4`
 MAGENTA=`tput setaf 5`
 CYAN=`tput setaf 6`
-
 BOLD=`tput bold`
 RESET=`tput sgr0`
 
-echo -e "${BLUE}===============================================${NC}"
-echo -e "${BLUE}    GOOGLE CLOUD ARCADE 2026 - GC_2026        ${NC}"
-echo -e "${BLUE}===============================================${NC}"
+echo -e "${BLUE}${BOLD}=================================================${RESET}"
+echo -e "${BLUE}${BOLD}    GOOGLE CLOUD ARCADE 2026 - GC_2026          ${RESET}"
+echo -e "${BLUE}${BOLD}=================================================${RESET}"
+echo -e "${CYAN}${BOLD}   Cloud Monitoring: Qwik Start - Automation     ${RESET}"
+echo -e "${BLUE}${BOLD}=================================================${RESET}"
 
-echo "${GREEN}${BOLD}Starting Execution${RESET}"
+# Function to display progress
+function show_progress() {
+    echo -e "${YELLOW}${BOLD}[PROGRESS]${RESET} ${CYAN}$1${RESET}"
+}
 
-# Ask user input for Email
+show_progress "Initializing environment..."
+
+# 1. Set Project ID
+export PROJECT_ID=$(gcloud config get-value project)
+export DEVSHELL_PROJECT_ID=$PROJECT_ID
+
+# 2. Get User Email for Alerting
+echo -e "${MAGENTA}${BOLD}-------------------------------------------------${RESET}"
 read -p "Enter your personal EMAIL for alerts: " USER_EMAIL
 export USER_EMAIL
+echo -e "${MAGENTA}${BOLD}-------------------------------------------------${RESET}"
 
+# 3. Detect Zone and Region
+show_progress "Detecting default zone and region..."
 export ZONE=$(gcloud compute project-info describe \
 --format="value(commonInstanceMetadata.items[google-compute-default-zone])")
 
 export REGION=$(gcloud compute project-info describe \
 --format="value(commonInstanceMetadata.items[google-compute-default-region])")
 
-# Fallback if zone is not set
+# Fallback if metadata is not set
 if [ -z "$ZONE" ]; then
+    show_progress "Automatic detection failed. Please enter the Zone."
     read -p "Enter ZONE (e.g., us-west1-a): " ZONE
     REGION=$(echo $ZONE | sed 's/-[a-z]$//')
 fi
@@ -42,127 +57,185 @@ fi
 gcloud config set compute/zone $ZONE
 gcloud config set compute/region $REGION
 
-# Create the instance with the necessary metadata and tags
-gcloud compute instances create lamp-1-vm \
-    --project=$DEVSHELL_PROJECT_ID \
-    --zone=$ZONE \
-    --machine-type=e2-small \
-    --network-interface=network-tier=PREMIUM,stack-type=IPV4_ONLY,subnet=default \
-    --metadata=enable-oslogin=false \
-    --maintenance-policy=MIGRATE \
-    --provisioning-model=STANDARD \
-    --tags=http-server \
-    --create-disk=auto-delete=yes,boot=yes,device-name=lamp-1-vm,image=projects/debian-cloud/global/images/debian-10-buster-v20230629,mode=rw,size=10,type=projects/$DEVSHELL_PROJECT_ID/zones/$ZONE/diskTypes/pd-balanced \
-    --no-shielded-secure-boot \
-    --shielded-vtpm \
-    --shielded-integrity-monitoring \
-    --labels=goog-ec-src=vm_add-gcloud \
-    --reservation-affinity=any
+echo -e "${GREEN}${BOLD}Project:${RESET} $PROJECT_ID"
+echo -e "${GREEN}${BOLD}Zone:   ${RESET} $ZONE"
+echo -e "${GREEN}${BOLD}Region: ${RESET} $REGION"
 
-# Create firewall rule to allow incoming HTTP traffic on port 80
+# ------------------------------------------------
+# Task 1 & 2: Create VM and Install Software
+# ------------------------------------------------
+show_progress "Creating LAMP VM instance (Debian 12)..."
+
+# Check if instance already exists
+if gcloud compute instances describe lamp-1-vm --zone=$ZONE &>/dev/null; then
+    show_progress "VM lamp-1-vm already exists. Skipping creation."
+else
+    gcloud compute instances create lamp-1-vm \
+        --project=$PROJECT_ID \
+        --zone=$ZONE \
+        --machine-type=e2-medium \
+        --network-interface=network-tier=PREMIUM,stack-type=IPV4_ONLY,subnet=default \
+        --metadata=enable-oslogin=false \
+        --tags=http-server \
+        --image-family=debian-12 \
+        --image-project=debian-cloud \
+        --boot-disk-size=10GB \
+        --boot-disk-type=pd-balanced \
+        --metadata=startup-script='#! /bin/bash
+apt-get update
+apt-get install -y apache2 php
+systemctl enable apache2
+systemctl start apache2
+curl -sSO https://dl.google.com/cloudagents/add-google-cloud-ops-agent-repo.sh
+bash add-google-cloud-ops-agent-repo.sh --also-install
+'
+fi
+
+# ------------------------------------------------
+# Firewall Rule
+# ------------------------------------------------
+show_progress "Configuring firewall for HTTP traffic..."
+
 gcloud compute firewall-rules create allow-http \
-    --project=$DEVSHELL_PROJECT_ID \
+    --project=$PROJECT_ID \
     --direction=INGRESS \
     --priority=1000 \
     --network=default \
     --action=ALLOW \
     --rules=tcp:80 \
     --source-ranges=0.0.0.0/0 \
-    --target-tags=http-server
+    --target-tags=http-server --quiet || true
 
-cat > prepare_disk.sh <<'EOF_END'
-sudo apt-get update
-sudo apt-get install -y apache2 php7.0
-sudo service apache2 restart
-EOF_END
+show_progress "Waiting for VM services to initialize (30 seconds)..."
+sleep 30
 
-gcloud compute scp prepare_disk.sh lamp-1-vm:/tmp --project=$DEVSHELL_PROJECT_ID --zone=$ZONE --quiet
-gcloud compute ssh lamp-1-vm --project=$DEVSHELL_PROJECT_ID --zone=$ZONE --quiet --command="bash /tmp/prepare_disk.sh"
+# ------------------------------------------------
+# Task 3: Create Uptime Check (using REST API)
+# ------------------------------------------------
+show_progress "Creating Uptime Check (Resource: Port 80)..."
 
-export INSTANCE_ID=$(gcloud compute instances list --filter=lamp-1-vm --zones $ZONE --format="value(id)")
+INSTANCE_ID=$(gcloud compute instances list --filter=lamp-1-vm --zones $ZONE --format="value(id)")
+EXTERNAL_IP=$(gcloud compute instances describe lamp-1-vm --zone=$ZONE --format='get(networkInterfaces[0].accessConfigs[0].natIP)')
 
-curl -X POST -H "Authorization: Bearer $(gcloud auth print-access-token)" -H "Content-Type: application/json" \
-  "https://monitoring.googleapis.com/v3/projects/$DEVSHELL_PROJECT_ID/uptimeCheckConfigs" \
-  -d "$(cat <<EOF
+# Create Uptime Check Config via REST to ensure 100% lab compliance with URL types
+cat > uptime-check.json <<EOF
 {
   "displayName": "Lamp Uptime Check",
-  "httpCheck": {
-    "path": "/",
-    "port": 80,
-    "requestMethod": "GET"
-  },
+  "httpCheck": { "path": "/", "port": 80, "requestMethod": "GET" },
   "monitoredResource": {
-    "labels": {
-      "instance_id": "$INSTANCE_ID",
-      "project_id": "$DEVSHELL_PROJECT_ID",
-      "zone": "$ZONE"
-    },
-    "type": "gce_instance"
+    "labels": { "host": "$EXTERNAL_IP", "project_id": "$PROJECT_ID" },
+    "type": "uptime_url"
   }
 }
 EOF
-)"
 
-cat > email-channel.json <<EOF_END
+curl -X POST -H "Authorization: Bearer $(gcloud auth print-access-token)" -H "Content-Type: application/json" \
+  "https://monitoring.googleapis.com/v3/projects/$PROJECT_ID/uptimeCheckConfigs" \
+  -d @uptime-check.json
+
+# ------------------------------------------------
+# Task 4: Notification Channel and Alert Policy
+# ------------------------------------------------
+show_progress "Automating Alert Policy and Notification Channels..."
+
+# Create the channel
+cat > email-channel.json <<EOF
 {
   "type": "email",
   "displayName": "GC_2026 Alert",
-  "description": "Alert notification",
-  "labels": {
-    "email_address": "$USER_EMAIL"
-  }
+  "description": "Lab alert channel",
+  "labels": { "email_address": "$USER_EMAIL" }
 }
-EOF_END
+EOF
 
 gcloud beta monitoring channels create --channel-content-from-file="email-channel.json"
 
-# Get the channel ID
-email_channel_info=$(gcloud beta monitoring channels list --filter='displayName="GC_2026 Alert"')
-email_channel_id=$(echo "$email_channel_info" | grep -oP 'name: \K[^ ]+' | head -n 1)
+# Get the channel name (id)
+CHANNEL_ID=$(gcloud beta monitoring channels list --filter='displayName="GC_2026 Alert"' --format='value(name)')
 
-cat > awesome.json <<EOF_END
+# Create the alert policy attached to the channel
+cat > alert-policy.json <<EOF
 {
   "displayName": "Inbound Traffic Alert",
-  "userLabels": {},
-  "conditions": [
-    {
+  "conditions": [{
       "displayName": "VM Instance - Network traffic",
       "conditionThreshold": {
         "filter": "resource.type = \"gce_instance\" AND metric.type = \"agent.googleapis.com/interface/traffic\"",
-        "aggregations": [
-          {
-            "alignmentPeriod": "300s",
-            "crossSeriesReducer": "REDUCE_NONE",
-            "perSeriesAligner": "ALIGN_RATE"
-          }
-        ],
+        "aggregations": [{ "alignmentPeriod": "60s", "perSeriesAligner": "ALIGN_RATE" }],
         "comparison": "COMPARISON_GT",
         "duration": "60s",
-        "trigger": {
-          "count": 1
-        },
         "thresholdValue": 500
       }
-    }
-  ],
-  "alertStrategy": {
-    "notificationPrompts": [
-      "OPENED"
-    ]
-  },
+  }],
   "combiner": "OR",
   "enabled": true,
-  "notificationChannels": [
-    "$email_channel_id"
-  ],
-  "severity": "SEVERITY_UNSPECIFIED"
+  "notificationChannels": ["$CHANNEL_ID"]
 }
-EOF_END
+EOF
 
-gcloud alpha monitoring policies create --policy-from-file="awesome.json"
+gcloud alpha monitoring policies create --policy-from-file="alert-policy.json"
 
-# Final message
-echo -e "\n${GREEN}${BOLD}You have successfully set up and monitored a VM with Cloud Monitoring. You've also created an uptime check, an alerting policy, and a dashboard and chart. You've seen how Cloud Logging reflects changes to your VM instance${RESET}"
-echo -e "\n${YELLOW}Join our WhatsApp community for updates: ${NC}https://chat.whatsapp.com/K9d9xZNy2YqBqu6wvGEh2h"
-echo -e "${GREEN}Happy Learning with GC_2026!${NC}"
-#-----------------------------------------------------end----------------------------------------------------------#
+# ------------------------------------------------
+# Task 5: Create Monitoring Dashboard
+# ------------------------------------------------
+show_progress "Creating Monitoring Dashboard..."
+
+cat > dashboard.json <<EOF
+{
+  "displayName": "Cloud Monitoring LAMP Qwik Start Dashboard",
+  "gridLayout": {
+    "widgets": [
+      {
+        "title": "CPU Load",
+        "xyChart": {
+          "dataSets": [{
+            "timeSeriesQuery": {
+              "timeSeriesFilter": {
+                "filter": "metric.type=\"compute.googleapis.com/instance/cpu/utilization\"",
+                "aggregation": {"alignmentPeriod": "60s","perSeriesAligner": "ALIGN_MEAN"}
+              }
+            }
+          }]
+        }
+      },
+      {
+        "title": "Received Packets",
+        "xyChart": {
+          "dataSets": [{
+            "timeSeriesQuery": {
+              "timeSeriesFilter": {
+                "filter": "metric.type=\"compute.googleapis.com/instance/network/received_packets_count\"",
+                "aggregation": {"alignmentPeriod": "60s","perSeriesAligner": "ALIGN_RATE"}
+              }
+            }
+          }]
+        }
+      }
+    ]
+  }
+}
+EOF
+
+gcloud monitoring dashboards create --config-from-file=dashboard.json
+
+# ------------------------------------------------
+# Task 6 & 7: Restart VM to Generate Logs
+# ------------------------------------------------
+show_progress "Restarting VM to generate traffic and logs..."
+
+gcloud compute instances stop lamp-1-vm --zone=$ZONE
+sleep 10
+gcloud compute instances start lamp-1-vm --zone=$ZONE
+
+echo -e "${GREEN}${BOLD}=================================================${RESET}"
+echo -e "${GREEN}${BOLD}    Lab Setup Completed Successfully! 🚀        ${RESET}"
+echo -e "${GREEN}${BOLD}=================================================${RESET}"
+echo ""
+echo -e "${BLUE}${BOLD}Final Step:${RESET} Go back to the lab and click ${YELLOW}Check My Progress${RESET} for all tasks."
+echo ""
+echo -e "${YELLOW}${BOLD}Join GC_2026 Community:${RESET} https://chat.whatsapp.com/K9d9xZNy2YqBqu6wvGEh2h"
+echo -e "${MAGENTA}${BOLD}Happy Learning!${RESET}"
+echo -e "${GREEN}${BOLD}=================================================${RESET}"
+
+# Cleanup
+rm -f uptime-check.json email-channel.json alert-policy.json dashboard.json
