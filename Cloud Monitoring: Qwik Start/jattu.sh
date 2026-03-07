@@ -87,7 +87,7 @@ show_progress "VM External IP: $EXTERNAL_IP"
 show_progress "Creating uptime check..."
 
 gcloud monitoring uptime create lamp-uptime-check \
---resource-type=url \
+--resource-type=uptime-url \
 --hostname=$EXTERNAL_IP \
 --path="/" \
 --port=80
