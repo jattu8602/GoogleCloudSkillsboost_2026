@@ -70,7 +70,7 @@ gcloud compute instance-groups managed set-autoscaling autoscaling-instance-grou
 --zone=$ZONE \
 --min-num-replicas=1 \
 --max-num-replicas=3 \
---custom-metric-utilization metric=custom.googleapis.com/appdemo_queue_depth_01,utilization-target=150,utilization-target-type=gauge
+--custom-metric-utilization=metric=custom.googleapis.com/appdemo_queue_depth_01,utilization-target=150,utilization-target-type=GAUGE
 
 echo ""
 echo -e "${GREEN}===============================================${NC}"
