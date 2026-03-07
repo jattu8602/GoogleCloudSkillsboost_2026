@@ -30,8 +30,13 @@ function show_progress() {
 show_progress "Initializing environment..."
 
 # 1. Set Project ID
-export PROJECT_ID=$(gcloud config get-value project)
-export DEVSHELL_PROJECT_ID=$PROJECT_ID
+export PROJECT_ID=$(gcloud config get-value project 2>/dev/null)
+if [ -z "$PROJECT_ID" ]; then
+    export PROJECT_ID=$DEVSHELL_PROJECT_ID
+fi
+
+# Explicitly set the project to trigger account association in Cloud Shell
+gcloud config set project $PROJECT_ID --quiet
 
 # 2. Get User Email for Alerting
 echo -e "${MAGENTA}${BOLD}-------------------------------------------------${RESET}"
@@ -41,21 +46,24 @@ echo -e "${MAGENTA}${BOLD}-------------------------------------------------${RES
 
 # 3. Detect Zone and Region
 show_progress "Detecting default zone and region..."
+
+# Silence errors for detection as it might fail in restricted environments
 export ZONE=$(gcloud compute project-info describe \
---format="value(commonInstanceMetadata.items[google-compute-default-zone])")
+--format="value(commonInstanceMetadata.items[google-compute-default-zone])" 2>/dev/null || echo "")
 
 export REGION=$(gcloud compute project-info describe \
---format="value(commonInstanceMetadata.items[google-compute-default-region])")
+--format="value(commonInstanceMetadata.items[google-compute-default-region])" 2>/dev/null || echo "")
 
 # Fallback if metadata is not set
 if [ -z "$ZONE" ]; then
-    show_progress "Automatic detection failed. Please enter the Zone."
-    read -p "Enter ZONE (e.g., us-west1-a): " ZONE
+    show_progress "Automatic detection failed or permission denied."
+    echo -e "${YELLOW}Standard zones: us-east1-b, us-west1-a, europe-west1-b${RESET}"
+    read -p "Enter ZONE: " ZONE
     REGION=$(echo $ZONE | sed 's/-[a-z]$//')
 fi
 
-gcloud config set compute/zone $ZONE
-gcloud config set compute/region $REGION
+gcloud config set compute/zone $ZONE --quiet
+gcloud config set compute/region $REGION --quiet
 
 echo -e "${GREEN}${BOLD}Project:${RESET} $PROJECT_ID"
 echo -e "${GREEN}${BOLD}Zone:   ${RESET} $ZONE"
