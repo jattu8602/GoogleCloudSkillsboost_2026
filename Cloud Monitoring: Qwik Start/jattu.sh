@@ -116,6 +116,17 @@ gcloud compute firewall-rules create allow-http \
 show_progress "Waiting for VM services to initialize (30 seconds)..."
 sleep 30
 
+echo -e "${YELLOW}${BOLD}-------------------------------------------------${RESET}"
+echo -e "${YELLOW}${BOLD}STEP 1: Please go to the lab page.${RESET}"
+echo -e "${YELLOW}${BOLD}Click 'Check My Progress' for Task 1 & 2.${RESET}"
+echo -e "${YELLOW}${BOLD}Wait for them to turn green before continuing.${RESET}"
+echo -e "${YELLOW}${BOLD}-------------------------------------------------${RESET}"
+read -p "Have you completed the progress checks? (y/n): " CHECK_1
+if [[ "$CHECK_1" != "y" ]]; then
+    echo -e "${RED}Please complete the progress checks first!${RESET}"
+    exit 1
+fi
+
 # ------------------------------------------------
 # Task 3: Create Uptime Check (using REST API)
 # ------------------------------------------------
@@ -123,6 +134,9 @@ sleep 30
 if curl -X GET -H "Authorization: Bearer $(gcloud auth print-access-token)" "https://monitoring.googleapis.com/v3/projects/$PROJECT_ID/uptimeCheckConfigs" 2>/dev/null | grep -q 'Lamp Uptime Check'; then
     show_progress "Uptime check 'Lamp Uptime Check' already exists. Skipping creation."
 else
+    show_progress "Fetching VM details for Uptime Check..."
+    export EXTERNAL_IP=$(gcloud compute instances describe lamp-1-vm --zone=$ZONE --format='get(networkInterfaces[0].accessConfigs[0].natIP)')
+
     show_progress "Creating Uptime Check (Resource: Port 80)..."
     cat > uptime-check.json <<EOF
 {
@@ -232,6 +246,16 @@ else
 }
 EOF
     gcloud monitoring dashboards create --config-from-file=dashboard.json
+fi
+
+echo -e "${YELLOW}${BOLD}-------------------------------------------------${RESET}"
+echo -e "${YELLOW}${BOLD}STEP 2: Please go to the lab page.${RESET}"
+echo -e "${YELLOW}${BOLD}Click 'Check My Progress' for Task 3 & 4.${RESET}"
+echo -e "${YELLOW}${BOLD}-------------------------------------------------${RESET}"
+read -p "Have you completed the progress checks? (y/n): " CHECK_2
+if [[ "$CHECK_2" != "y" ]]; then
+    echo -e "${RED}Please complete the progress checks first!${RESET}"
+    exit 1
 fi
 
 # ------------------------------------------------
