@@ -112,13 +112,12 @@ sleep 30
 # ------------------------------------------------
 # Task 3: Create Uptime Check (using REST API)
 # ------------------------------------------------
-show_progress "Creating Uptime Check (Resource: Port 80)..."
-
-INSTANCE_ID=$(gcloud compute instances list --filter=lamp-1-vm --zones $ZONE --format="value(id)")
-EXTERNAL_IP=$(gcloud compute instances describe lamp-1-vm --zone=$ZONE --format='get(networkInterfaces[0].accessConfigs[0].natIP)')
-
-# Create Uptime Check Config via REST to ensure 100% lab compliance with URL types
-cat > uptime-check.json <<EOF
+# Check if the uptime check already exists
+if curl -X GET -H "Authorization: Bearer $(gcloud auth print-access-token)" "https://monitoring.googleapis.com/v3/projects/$PROJECT_ID/uptimeCheckConfigs" 2>/dev/null | grep -q 'Lamp Uptime Check'; then
+    show_progress "Uptime check 'Lamp Uptime Check' already exists. Skipping creation."
+else
+    show_progress "Creating Uptime Check (Resource: Port 80)..."
+    cat > uptime-check.json <<EOF
 {
   "displayName": "Lamp Uptime Check",
   "httpCheck": { "path": "/", "port": 80, "requestMethod": "GET" },
@@ -128,18 +127,22 @@ cat > uptime-check.json <<EOF
   }
 }
 EOF
-
-curl -X POST -H "Authorization: Bearer $(gcloud auth print-access-token)" -H "Content-Type: application/json" \
-  "https://monitoring.googleapis.com/v3/projects/$PROJECT_ID/uptimeCheckConfigs" \
-  -d @uptime-check.json
+    curl -X POST -H "Authorization: Bearer $(gcloud auth print-access-token)" -H "Content-Type: application/json" \
+      "https://monitoring.googleapis.com/v3/projects/$PROJECT_ID/uptimeCheckConfigs" \
+      -d @uptime-check.json
+fi
 
 # ------------------------------------------------
 # Task 4: Notification Channel and Alert Policy
 # ------------------------------------------------
 show_progress "Automating Alert Policy and Notification Channels..."
 
-# Create the channel
-cat > email-channel.json <<EOF
+# Check if the channel already exists
+CHANNEL_ID=$(gcloud beta monitoring channels list --filter='displayName="GC_2026 Alert"' --format='value(name)' | head -n 1)
+
+if [ -z "$CHANNEL_ID" ]; then
+    show_progress "Creating new notification channel..."
+    cat > email-channel.json <<EOF
 {
   "type": "email",
   "displayName": "GC_2026 Alert",
@@ -147,14 +150,18 @@ cat > email-channel.json <<EOF
   "labels": { "email_address": "$USER_EMAIL" }
 }
 EOF
+    gcloud beta monitoring channels create --channel-content-from-file="email-channel.json"
+    CHANNEL_ID=$(gcloud beta monitoring channels list --filter='displayName="GC_2026 Alert"' --format='value(name)' | head -n 1)
+else
+    show_progress "Using existing notification channel: $CHANNEL_ID"
+fi
 
-gcloud beta monitoring channels create --channel-content-from-file="email-channel.json"
-
-# Get the channel name (id)
-CHANNEL_ID=$(gcloud beta monitoring channels list --filter='displayName="GC_2026 Alert"' --format='value(name)')
-
-# Create the alert policy attached to the channel
-cat > alert-policy.json <<EOF
+# Create the alert policy (if it doesn't already exist)
+if gcloud alpha monitoring policies list --filter='displayName="Inbound Traffic Alert"' --format='value(name)' | grep -q 'projects/'; then
+    show_progress "Alert policy 'Inbound Traffic Alert' already exists. Skipping creation."
+else
+    show_progress "Creating new alert policy..."
+    cat > alert-policy.json <<EOF
 {
   "displayName": "Inbound Traffic Alert",
   "conditions": [{
@@ -172,15 +179,17 @@ cat > alert-policy.json <<EOF
   "notificationChannels": ["$CHANNEL_ID"]
 }
 EOF
-
-gcloud alpha monitoring policies create --policy-from-file="alert-policy.json"
+    gcloud alpha monitoring policies create --policy-from-file="alert-policy.json"
+fi
 
 # ------------------------------------------------
 # Task 5: Create Monitoring Dashboard
 # ------------------------------------------------
-show_progress "Creating Monitoring Dashboard..."
-
-cat > dashboard.json <<EOF
+if gcloud monitoring dashboards list --filter='displayName="Cloud Monitoring LAMP Qwik Start Dashboard"' --format='value(name)' | grep -q 'projects/'; then
+    show_progress "Dashboard already exists. Skipping creation."
+else
+    show_progress "Creating Monitoring Dashboard..."
+    cat > dashboard.json <<EOF
 {
   "displayName": "Cloud Monitoring LAMP Qwik Start Dashboard",
   "gridLayout": {
@@ -215,8 +224,8 @@ cat > dashboard.json <<EOF
   }
 }
 EOF
-
-gcloud monitoring dashboards create --config-from-file=dashboard.json
+    gcloud monitoring dashboards create --config-from-file=dashboard.json
+fi
 
 # ------------------------------------------------
 # Task 6 & 7: Restart VM to Generate Logs
