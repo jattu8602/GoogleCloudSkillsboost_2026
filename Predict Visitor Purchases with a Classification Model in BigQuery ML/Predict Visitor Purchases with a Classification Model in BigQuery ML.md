@@ -1,25 +1,99 @@
-## Predict Visitor Purchases with a Classification Model in BigQuery ML
+# Predict Visitor Purchases with a Classification Model in BigQuery ML || [GSP229](https://www.cloudskillsboost.google/focuses/1794?parent=catalog) ||
 
-
-
-### ⚠️ Disclaimer
-- **This script and guide are provided for  the educational purposes to help you understand the lab services and boost your career. Before using the script, please open and review it to familiarize yourself with Google Cloud services. Ensure that you follow 'Qwiklabs' terms of service and YouTube’s community guidelines. The goal is to enhance your learning experience, not to bypass it.**
-
-### ©Credit
-- **DM for credit or removal request (no copyright intended) ©All rights and credits for the original content belong to Google Cloud [Google Cloud Skill Boost website](https://www.cloudskillsboost.google/)** 🙏
-
+## Solution [here](https://youtu.be/Bq-AW9aIFaA)
 
 ### Run the following Commands in CloudShell
 
 ```
-curl -LO https://raw.githubusercontent.com/Itsabhishek7py/GoogleCloudSkillsboost/refs/heads/main/Predict%20Visitor%20Purchases%20with%20a%20Classification%20Model%20in%20BigQuery%20ML/abhishek.sh
-sudo chmod +x abhishek.sh
-./abhishek.sh
+curl -LO raw.githubusercontent.com/Cloud-Wala-Banda/Labs-Solutions/main/Predict%20Visitor%20Purchases%20with%20a%20Classification%20Model%20in%20BigQuery%20ML/gsp229.sh
+
+sudo chmod +x gsp229.sh
+
+./gsp229.sh
 ```
-### Congratulations !!!!
+* Go to BigQuery from [here](https://console.cloud.google.com/bigquery)
 
-Connect with fellow cloud enthusiasts, ask questions, and share your learning journey.  
+* *Copy and paste the following query into the `BigQuery Editor`:*
 
-[![Telegram](https://img.shields.io/badge/Telegram_Group-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/+gBcgRTlZLyM4OGI1)  
-[![YouTube](https://img.shields.io/badge/Subscribe-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://www.youtube.com/@drabhishek.5460?sub_confirmation=1)  
-[![Instagram](https://img.shields.io/badge/Follow-%23E4405F?style=for-the-badge&logo=instagram&logoColor=white)](https://www.instagram.com/drabhishek.5460/) 
+```
+#standardSQL
+SELECT
+  roc_auc,
+  CASE
+    WHEN roc_auc > .9 THEN 'good'
+    WHEN roc_auc > .8 THEN 'fair'
+    WHEN roc_auc > .7 THEN 'decent'
+    WHEN roc_auc > .6 THEN 'not great'
+  ELSE 'poor' END AS model_quality
+FROM
+  ML.EVALUATE(MODEL ecommerce.classification_model_2,  (
+
+WITH all_visitor_stats AS (
+SELECT
+  fullvisitorid,
+  IF(COUNTIF(totals.transactions > 0 AND totals.newVisits IS NULL) > 0, 1, 0) AS will_buy_on_return_visit
+  FROM `data-to-insights.ecommerce.web_analytics`
+  GROUP BY fullvisitorid
+)
+
+# add in new features
+SELECT * EXCEPT(unique_session_id) FROM (
+
+  SELECT
+      CONCAT(fullvisitorid, CAST(visitId AS STRING)) AS unique_session_id,
+
+      # labels
+      will_buy_on_return_visit,
+
+      MAX(CAST(h.eCommerceAction.action_type AS INT64)) AS latest_ecommerce_progress,
+
+      # behavior on the site
+      IFNULL(totals.bounces, 0) AS bounces,
+      IFNULL(totals.timeOnSite, 0) AS time_on_site,
+      totals.pageviews,
+
+      # where the visitor came from
+      trafficSource.source,
+      trafficSource.medium,
+      channelGrouping,
+
+      # mobile or desktop
+      device.deviceCategory,
+
+      # geographic
+      IFNULL(geoNetwork.country, "") AS country
+
+  FROM `data-to-insights.ecommerce.web_analytics`,
+     UNNEST(hits) AS h
+
+    JOIN all_visitor_stats USING(fullvisitorid)
+
+  WHERE 1=1
+    # only predict for new visits
+    AND totals.newVisits = 1
+    AND date BETWEEN '20170501' AND '20170630' # eval 2 months
+
+  GROUP BY
+  unique_session_id,
+  will_buy_on_return_visit,
+  bounces,
+  time_on_site,
+  totals.pageviews,
+  trafficSource.source,
+  trafficSource.medium,
+  channelGrouping,
+  device.deviceCategory,
+  country
+)
+));
+```
+
+### Congratulations 🎉 for Completing the Lab !
+
+##### *You Have Successfully Demonstrated Your Skills And Determination.*
+
+#### *Well done!*
+
+#### Don't Forget to Join the [Telegram Channel](https://t.me/cloudwalabanda) & [Discussion group](https://t.me/cloudwalabandachats)
+
+# [Cloud Wala Banda](https://www.youtube.com/@cloudwalabanda)

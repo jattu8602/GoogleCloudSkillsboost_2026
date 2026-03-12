@@ -1,6 +1,6 @@
-# Google Chat Bot - Apps Script 
-### ⚠️ Disclaimer
-- **This script and guide are provided for  the educational purposes to help you understand the lab services and boost your career. Before using the script, please open and review it to familiarize yourself with Google Cloud services. Ensure that you follow 'Qwiklabs' terms of service and YouTube’s community guidelines. The goal is to enhance your learning experience, not to bypass it.**
+# Google Chat Bot - Apps Script || [GSP250](https://www.cloudskillsboost.google/focuses/32756?parent=catalog) ||
+
+## Solution [here](https://youtu.be/fCqeNrXpE0Q)
 
 ### Task 1. Create a chat app from a template
 
@@ -8,9 +8,9 @@
 
 2. Click Untitled project (the current name).
 
-3. In the Edit project name dialog, rename the project to **Attendance Bot**, and then click Rename.
+3. In the Edit project name dialog, rename the project to **Attendance Bot** and then click Rename.
 
-* Copy and replace the following in `Code.gs`
+4. Copy and replace the following in `Code.gs`
 
 ```
 /**
@@ -64,34 +64,28 @@ function onRemoveFromSpace(event) {
       (event.space.name ? event.space.name : "this chat"));
 }
 ```
-4. Click **Save** to save the `Code.gs` file
+5. Click **Save** to save the `Code.gs` file
 
 ### Task 2. Publish the bot
 
-* Go to **OAuth consent screen** from [here](https://console.cloud.google.com/apis/credentials/consent?)
+* Go to **OAuth consent screen** from [here](https://console.cloud.google.com/auth/overview?)
 
-1. Set **User Type** to **Internal**, and click **Create**.
-
-2. On the next page, (the **OAuth consent** screen), configure the following:
+1. On the Project configuration page, for App Information configure the following and click Next:
 
 | Field | Value |
 | :---: | :----: |
 | App name | Attendance Bot |
 | User support email | Select the email ID from the dropdown |
-| Developer contact information | Your user email address |
 
-# IMP
-- From the Navigation Menu, click Cloud Overview > Dashboard.
-- In the Dashboard, click Go to project settings in the Project Info section.
-- Record the Project number to use in the next step to configure your project.
-- Return to the App Script editor, and navigate to the Project Settings for the Attendance Bot project (gear icon for project settings).
-- Under Google Cloud Platform (GCP) Project, click Change project.
+2. For **Audience**, select **Internal** and click Next.
 
-For GCP Project number, enter the project number that you copied earlier. Then, click Set project.
+3. For the **Contact Information** type or paste your **user email** address and click Next.
+
+4. For **GCP Project number**, enter your project number.
 
 * Go to **Google Chat API Configuration Page** from [here](https://console.cloud.google.com/apis/api/chat.googleapis.com/hangouts-chat?)
 
-* In the **Configuration** dialog, set the fields with the following values:
+1. In the **Configuration** dialog, set the fields with the following values:
 
 | Field | Value |
 | :---: | :----: |
@@ -99,18 +93,18 @@ For GCP Project number, enter the project number that you copied earlier. Then, 
 | Avatar URL | https://goo.gl/kv2ENA |
 | Description | Apps Script lab bot |
 | Functionality | Select **Receive 1:1 messages** and **Join spaces and group conversations** |
-| Connection settings | Check **Apps Script project** and paste the Head Deployment ID into the Deployment ID field |
+| Connection settings | Check **Apps Script project** and paste the **Head Deployment ID** into the **Deployment ID** field |
 | Visibility | Your user email address |
 
-3. After the changes are saved, scroll to the top of the **Configuration** dialog to update the **App Status** to `LIVE – available to users`
+2. After the changes are saved, scroll to the top of the **Configuration** dialog to update the **App Status** to **LIVE – available to users**
 
-4. Click the [Google Chat](https://chat.google.com/) link to open Google Chat.
+* Click the [Google Chat](https://chat.google.com/) link to open Google Chat.
 
-5. Select **Start a chat** in the **Chat** section.
+1. Select **Start a chat** in the **Chat** section.
 
-6. Search for **Attendance bot**
+2. Search for **Attendance bot**
 
-7. From the results, select the Attendance Bot, Apps Script lab bot that you created, and click **Start chat**
+3. From the results, select the **Attendance Bot**, Apps Script lab bot that you created, and click **Start chat**
 
 ### Task 3. Define a card-formatted response
 
@@ -380,13 +374,13 @@ function blockOutCalendar(reason) {
 * Click **Add**.
 
 * Return to the DM in Google Chat, and type **I'm sick**
-* Set vacation in Gmail
-* Block out day in Calendar
 
 ### Congratulations 🎉 for completing the Lab !
 
+##### *You Have Successfully Demonstrated Your Skills And Determination.*
 
-## Connect
-Join our community for more learning:
-[![Telegram](https://img.shields.io/badge/Telegram_Group-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/+gBcgRTlZLyM4OGI1)
-[![YouTube](https://img.shields.io/badge/Subscribe-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://www.youtube.com/@drabhishek.5460?sub_confirmation=1)
+#### *Well done!*
+
+#### Don't Forget to Join the [Telegram Channel](https://t.me/cloudwalabanda) & [Discussion group](https://t.me/cloudwalabandachats)
+
+# [Cloud Wala Banda](https://www.youtube.com/@cloudwalabanda)
